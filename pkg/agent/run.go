@@ -884,6 +884,12 @@ func (m *AgentManager) Start(ctx context.Context, opts api.StartOptions) (*api.A
 		}(),
 		GitClone:             opts.GitClone,
 		SharedDirs:           effectiveSharedDirs,
+		CompanionRepos: func() []api.CompanionRepo {
+			if finalScionCfg != nil {
+				return finalScionCfg.CompanionRepos
+			}
+			return nil
+		}(),
 		BrokerMode:           opts.BrokerMode,
 		Debug:                util.DebugEnabled(),
 		Resume:               opts.Resume,

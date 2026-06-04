@@ -17,3 +17,15 @@ schema_version: "1"
 description: "Default scion agent template"
 agent_instructions: agents.md
 system_prompt: system-prompt.md
+
+# Companion repositories mounted read-only for cross-repo work.
+# Local-mac provider follows host working copy; remote providers use the ref.
+companion_repos:
+  - repo: zeel-dev/infra
+    ref: main
+    mode: ro
+    mount_path: ~/projects/github.com/zeel-dev/infra
+  - repo: zeel-dev/ng-fusion
+    ref: main
+    mode: ro
+    mount_path: ~/projects/github.com/zeel-dev/ng-fusion

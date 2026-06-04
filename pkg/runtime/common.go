@@ -225,6 +225,37 @@ func buildCommonRunArgs(config RunConfig) ([]string, error) {
 		addArg("--workdir", "/workspace")
 	}
 
+	// Mount companion repos (local-mac provider: virtiofs mount of host path)
+	// This follows the host working copy, ignoring the ref field (huge ergonomic win).
+	for _, cr := range config.CompanionRepos {
+		// Parse owner/repo from the repo field
+		parts := strings.Split(cr.Repo, "/")
+		if len(parts) != 2 {
+			continue // skip invalid repo format (should have been caught by validation)
+		}
+		owner, repo := parts[0], parts[1]
+
+		// Determine mount path (default: ~/projects/github.com/{owner}/{repo})
+		mountPath := cr.MountPath
+		if mountPath == "" {
+			mountPath = fmt.Sprintf("~/projects/github.com/%s/%s", owner, repo)
+		}
+		containerPath := expandPath(mountPath, true)
+
+		// Host path: ~/projects/github.com/{owner}/{repo}
+		hostPath := filepath.Join(hostHome, "projects", "github.com", owner, repo)
+
+		// Check if the repo exists on the host
+		if _, err := os.Stat(hostPath); err == nil {
+			// Mount read-only if mode is "ro" (or empty, default is ro)
+			readOnly := cr.Mode == "" || cr.Mode == "ro"
+			registerMount(hostPath, containerPath, readOnly, false)
+			slog.Debug("mounted companion repo", "repo", cr.Repo, "mode", cr.Mode, "path", containerPath)
+		} else {
+			slog.Warn("companion repo not found on host, skipping mount", "repo", cr.Repo, "path", hostPath)
+		}
+	}
+
 	// Add generic volumes from config, deduplicating among themselves first
 	// but respecting already registered mounts.
 	dedupedVolumes := make(map[string]api.VolumeMount)

@@ -123,6 +123,11 @@ func (t *Template) LoadConfig() (*api.ScionConfig, error) {
 		return nil, fmt.Errorf("invalid mcp_servers config in %s: %w", configPath, err)
 	}
 
+	// requireRef is false for local templates (they follow host working copy)
+	if err := api.ValidateCompanionRepos(cfg.CompanionRepos, false); err != nil {
+		return nil, fmt.Errorf("invalid companion_repos config in %s: %w", configPath, err)
+	}
+
 	return &cfg, nil
 }
 
@@ -699,6 +704,12 @@ func MergeScionConfig(base, override *api.ScionConfig) *api.ScionConfig {
 		newVolumes = append(newVolumes, base.Volumes...)
 		newVolumes = append(newVolumes, override.Volumes...)
 		result.Volumes = newVolumes
+	}
+	if override.CompanionRepos != nil {
+		newCompanionRepos := make([]api.CompanionRepo, 0, len(base.CompanionRepos)+len(override.CompanionRepos))
+		newCompanionRepos = append(newCompanionRepos, base.CompanionRepos...)
+		newCompanionRepos = append(newCompanionRepos, override.CompanionRepos...)
+		result.CompanionRepos = newCompanionRepos
 	}
 	if override.Detached != nil {
 		result.Detached = override.Detached

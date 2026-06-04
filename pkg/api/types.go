@@ -209,6 +209,16 @@ type SharedDir struct {
 	InWorkspace bool   `json:"in_workspace,omitempty" yaml:"in_workspace,omitempty"`
 }
 
+// CompanionRepo declares an additional repository that should be available
+// to the agent at a specific mount path. The runner is contractually obligated
+// to provide this repo before the agent starts.
+type CompanionRepo struct {
+	Repo      string `json:"repo" yaml:"repo"`                             // GitHub slug (owner/repo)
+	Ref       string `json:"ref,omitempty" yaml:"ref,omitempty"`           // Branch, tag, or SHA (required on non-local profiles)
+	Mode      string `json:"mode,omitempty" yaml:"mode,omitempty"`         // "ro" or "rw" (default: "ro")
+	MountPath string `json:"mount_path,omitempty" yaml:"mount_path,omitempty"` // Container path (default: ~/projects/github.com/{owner}/{repo})
+}
+
 // ValidateSharedDirs validates a slice of SharedDir entries.
 func ValidateSharedDirs(dirs []SharedDir) error {
 	seen := make(map[string]bool, len(dirs))
@@ -223,6 +233,37 @@ func ValidateSharedDirs(dirs []SharedDir) error {
 			return fmt.Errorf("shared_dirs[%d]: duplicate name %q", i, d.Name)
 		}
 		seen[d.Name] = true
+	}
+	return nil
+}
+
+// ValidateCompanionRepos validates a slice of CompanionRepo entries.
+// requireRef indicates whether the ref field is required (true for non-local profiles).
+func ValidateCompanionRepos(repos []CompanionRepo, requireRef bool) error {
+	seen := make(map[string]bool, len(repos))
+	for i, r := range repos {
+		if r.Repo == "" {
+			return fmt.Errorf("companion_repos[%d]: missing required field: repo", i)
+		}
+		// Validate repo is in owner/repo format
+		parts := strings.Split(r.Repo, "/")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("companion_repos[%d]: invalid repo format %q (must be owner/repo)", i, r.Repo)
+		}
+		if requireRef && r.Ref == "" {
+			return fmt.Errorf("companion_repos[%d]: ref is required for this profile", i)
+		}
+		if seen[r.Repo] {
+			return fmt.Errorf("companion_repos[%d]: duplicate repo %q", i, r.Repo)
+		}
+		seen[r.Repo] = true
+
+		switch r.Mode {
+		case "", "ro", "rw":
+			// valid
+		default:
+			return fmt.Errorf("companion_repos[%d]: invalid mode %q (must be \"ro\" or \"rw\")", i, r.Mode)
+		}
 	}
 	return nil
 }
@@ -437,6 +478,11 @@ type ScionConfig struct {
 	Telemetry     *TelemetryConfig           `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
 
 	Secrets []RequiredSecret `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+
+	// CompanionRepos declares additional repositories that should be available
+	// to the agent. The runner provides these repos at their mount paths before
+	// the agent starts.
+	CompanionRepos []CompanionRepo `json:"companion_repos,omitempty" yaml:"companion_repos,omitempty"`
 
 	// Agnostic template fields
 	AgentInstructions    string `json:"agent_instructions,omitempty" yaml:"agent_instructions,omitempty"`
